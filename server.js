@@ -3,6 +3,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const http = require("node:http");
 
+loadLocalConfig();
+
 const PORT = Number(process.env.PORT || 4174);
 const ADMIN_CODE = process.env.ADMIN_CODE || "admin2026";
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, "data", "store.json");
@@ -808,4 +810,32 @@ function httpError(status, message) {
   const error = new Error(message);
   error.status = status;
   return error;
+}
+
+function loadLocalConfig() {
+  const envPath = path.join(__dirname, ".env");
+  const jsonPath = path.join(__dirname, "config.local.json");
+
+  if (fs.existsSync(envPath)) {
+    fs.readFileSync(envPath, "utf8")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#"))
+      .forEach((line) => {
+        const separatorIndex = line.indexOf("=");
+        if (separatorIndex === -1) return;
+        const key = line.slice(0, separatorIndex).trim();
+        const value = line.slice(separatorIndex + 1).trim().replace(/^["']|["']$/g, "");
+        if (key && process.env[key] === undefined) process.env[key] = value;
+      });
+  }
+
+  if (fs.existsSync(jsonPath)) {
+    const config = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
+    Object.entries(config).forEach(([key, value]) => {
+      if (process.env[key] === undefined && value !== undefined && value !== null) {
+        process.env[key] = String(value);
+      }
+    });
+  }
 }

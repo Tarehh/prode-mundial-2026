@@ -1,2 +1,4 @@
 data/
 *.log
+.env
+config.local.json

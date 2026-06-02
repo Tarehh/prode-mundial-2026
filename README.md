@@ -37,10 +37,31 @@ $env:ADMIN_CODE="cambiar-este-codigo"
 node server.js
 ```
 
+Tambien podes crear un archivo local `config.local.json` en la raiz del proyecto. Ese
+archivo no se sube a Git.
+
+```json
+{
+  "ADMIN_CODE": "cambiar-este-codigo",
+  "API_FOOTBALL_KEY": "tu-api-key",
+  "API_FOOTBALL_LEAGUE_ID": "1",
+  "API_FOOTBALL_SEASON": "2026"
+}
+```
+
+Tambien se soporta `.env`:
+
+```text
+ADMIN_CODE=cambiar-este-codigo
+API_FOOTBALL_KEY=tu-api-key
+API_FOOTBALL_LEAGUE_ID=1
+API_FOOTBALL_SEASON=2026
+```
+
 ## Sincronizacion de fixture
 
 La pantalla Admin tiene un boton `Sincronizar fixture`. Usa API-Football/API-SPORTS
-cuando estas variables estan configuradas:
+cuando estas variables estan configuradas por entorno, `.env` o `config.local.json`:
 
 ```powershell
 $env:API_FOOTBALL_KEY="tu-api-key"
