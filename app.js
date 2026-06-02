@@ -32,8 +32,6 @@ const elements = {
   rankingList: document.querySelector("#rankingList"),
   adminMatchList: document.querySelector("#adminMatchList"),
   unlockNextButton: document.querySelector("#unlockNextButton"),
-  syncFixturesButton: document.querySelector("#syncFixturesButton"),
-  syncFixturesNote: document.querySelector("#syncFixturesNote"),
   commitPredictionsButton: document.querySelector("#commitPredictionsButton"),
   knockoutForm: document.querySelector("#knockoutForm"),
   knockoutHome: document.querySelector("#knockoutHome"),
@@ -137,16 +135,6 @@ elements.commitPredictionsButton.addEventListener("click", async () => {
 
 elements.unlockNextButton.addEventListener("click", async () => {
   await adminAction("/api/admin/unlock-next", { method: "POST" });
-});
-
-elements.syncFixturesButton.addEventListener("click", async () => {
-  elements.syncFixturesNote.textContent = "Sincronizando fixture...";
-  const response = await adminAction("/api/admin/sync-fixtures", { method: "POST" });
-  if (response?.syncReport) {
-    const report = response.syncReport;
-    elements.syncFixturesNote.textContent =
-      `Sincronizacion lista: ${report.updated} actualizados, ${report.finalized} finalizados, ${report.unmatched} sin match.`;
-  }
 });
 
 elements.adminPlayerForm.addEventListener("submit", async (event) => {

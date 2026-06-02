@@ -9,12 +9,6 @@ const PORT = Number(process.env.PORT || 4174);
 const ADMIN_CODE = process.env.ADMIN_CODE || "admin2026";
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, "data", "store.json");
 const PUBLIC_DIR = __dirname;
-const API_FOOTBALL_KEY = cleanConfigValue(process.env.API_FOOTBALL_KEY || "");
-const API_FOOTBALL_LEAGUE_ID = cleanConfigValue(process.env.API_FOOTBALL_LEAGUE_ID || "1");
-const API_FOOTBALL_SEASON = cleanConfigValue(process.env.API_FOOTBALL_SEASON || "2026");
-const API_FOOTBALL_BASE_URL = normalizeBaseUrl(
-  cleanConfigValue(process.env.API_FOOTBALL_BASE_URL || "https://v3.football.api-sports.io"),
-);
 
 const GROUPS = {
   A: ["Mexico", "Sudafrica", "Corea del Sur", "Chequia"],
@@ -109,57 +103,6 @@ const SCHEDULE = [
 const sessions = new Map();
 let db = loadDb();
 
-const TEAM_ALIASES = {
-  "alemania": ["alemania", "germany"],
-  "argelia": ["argelia", "algeria"],
-  "argentina": ["argentina"],
-  "arabia saudita": ["arabia saudita", "saudi arabia"],
-  "australia": ["australia"],
-  "austria": ["austria"],
-  "belgica": ["belgica", "belgium"],
-  "bosnia y herzegovina": ["bosnia y herzegovina", "bosnia and herzegovina", "bosnia-herzegovina"],
-  "brasil": ["brasil", "brazil"],
-  "cabo verde": ["cabo verde", "cape verde"],
-  "canada": ["canada"],
-  "chequia": ["chequia", "czechia", "czech republic"],
-  "colombia": ["colombia"],
-  "corea del sur": ["corea del sur", "south korea", "korea republic"],
-  "costa de marfil": ["costa de marfil", "ivory coast", "cote d ivoire", "cote d'ivoire"],
-  "croacia": ["croacia", "croatia"],
-  "curazao": ["curazao", "curacao"],
-  "ecuador": ["ecuador"],
-  "egipto": ["egipto", "egypt"],
-  "espana": ["espana", "spain"],
-  "escocia": ["escocia", "scotland"],
-  "estados unidos": ["estados unidos", "united states", "usa", "usmnt"],
-  "francia": ["francia", "france"],
-  "ghana": ["ghana"],
-  "haiti": ["haiti"],
-  "inglaterra": ["inglaterra", "england"],
-  "irak": ["irak", "iraq"],
-  "iran": ["iran"],
-  "japon": ["japon", "japan"],
-  "jordania": ["jordania", "jordan"],
-  "marruecos": ["marruecos", "morocco"],
-  "mexico": ["mexico"],
-  "noruega": ["noruega", "norway"],
-  "nueva zelanda": ["nueva zelanda", "new zealand"],
-  "paises bajos": ["paises bajos", "netherlands", "holland"],
-  "panama": ["panama"],
-  "paraguay": ["paraguay"],
-  "portugal": ["portugal"],
-  "qatar": ["qatar"],
-  "rd congo": ["rd congo", "dr congo", "congo dr", "democratic republic of congo"],
-  "senegal": ["senegal"],
-  "sudafrica": ["sudafrica", "south africa"],
-  "suecia": ["suecia", "sweden"],
-  "suiza": ["suiza", "switzerland"],
-  "tunez": ["tunez", "tunisia"],
-  "turquia": ["turquia", "turkey", "turkiye"],
-  "uruguay": ["uruguay"],
-  "uzbekistan": ["uzbekistan"],
-};
-
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -251,13 +194,6 @@ async function handleApi(req, res, url) {
       audit("matches.unlockNext", {});
       saveDb();
       sendJson(res, 200, buildClientState(session));
-      return;
-    }
-
-    if (req.method === "POST" && url.pathname === "/api/admin/sync-fixtures") {
-      const syncReport = await syncFixturesFromProvider();
-      saveDb();
-      sendJson(res, 200, { ...buildClientState(session), syncReport });
       return;
     }
 
@@ -474,167 +410,6 @@ function updateMatch(matchId, body) {
       match.final = false;
     }
   }
-}
-
-async function syncFixturesFromProvider() {
-  if (!API_FOOTBALL_KEY) {
-    throw httpError(400, "Configura API_FOOTBALL_KEY para sincronizar fixtures");
-  }
-
-  const url = new URL("/fixtures", API_FOOTBALL_BASE_URL);
-  url.searchParams.set("league", API_FOOTBALL_LEAGUE_ID);
-  url.searchParams.set("season", API_FOOTBALL_SEASON);
-
-  const response = await fetch(url, {
-    headers: {
-      "x-apisports-key": API_FOOTBALL_KEY,
-    },
-  });
-  const payload = await response.json().catch(() => ({}));
-  const providerError = formatProviderError(payload);
-  if (!response.ok || providerError) {
-    throw httpError(
-      response.status === 403 || providerError ? 403 : 502,
-      providerError || `API-Football respondio ${response.status}`,
-    );
-  }
-
-  const fixtures = Array.isArray(payload.response) ? payload.response : [];
-  let updated = 0;
-  let finalized = 0;
-  let unmatched = 0;
-
-  fixtures.forEach((fixture) => {
-    const match = findMatchForFixture(fixture);
-    if (!match) {
-      unmatched += 1;
-      return;
-    }
-    const before = JSON.stringify(match);
-    applyFixtureSync(match, fixture);
-    if (JSON.stringify(match) !== before) updated += 1;
-    if (match.final && match.resultLocked) finalized += 1;
-  });
-
-  audit("fixtures.sync", {
-    provider: "api-football",
-    updated,
-    finalized,
-    unmatched,
-    totalFromProvider: fixtures.length,
-  });
-
-  return {
-    provider: "api-football",
-    updated,
-    finalized,
-    unmatched,
-    totalFromProvider: fixtures.length,
-    syncedAt: now(),
-  };
-}
-
-function formatProviderError(payload) {
-  if (!payload?.errors) return "";
-  if (typeof payload.errors === "string") return payload.errors;
-  if (Array.isArray(payload.errors)) return payload.errors.join(". ");
-  const messages = Object.entries(payload.errors)
-    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(", ") : value}`)
-    .filter(Boolean);
-  return messages.join(". ");
-}
-
-function findMatchForFixture(fixture) {
-  const fixtureId = String(fixture.fixture?.id || "");
-  if (fixtureId) {
-    const byExternalId = db.matches.find((match) => String(match.externalFixtureId || "") === fixtureId);
-    if (byExternalId) return byExternalId;
-  }
-
-  const home = fixture.teams?.home?.name || "";
-  const away = fixture.teams?.away?.name || "";
-  return db.matches.find((match) => teamsMatch(match.home, home) && teamsMatch(match.away, away));
-}
-
-function applyFixtureSync(match, fixture) {
-  const startsAtUtc = fixture.fixture?.date || "";
-  const venueName = [fixture.fixture?.venue?.name, fixture.fixture?.venue?.city].filter(Boolean).join(", ");
-  const status = fixture.fixture?.status?.short || "";
-  const homeGoals = normalizeProviderGoal(fixture.goals?.home);
-  const awayGoals = normalizeProviderGoal(fixture.goals?.away);
-
-  match.externalProvider = "api-football";
-  match.externalFixtureId = String(fixture.fixture?.id || match.externalFixtureId || "");
-  if (startsAtUtc) {
-    match.startsAtUtc = startsAtUtc;
-    const localParts = formatFixtureDate(startsAtUtc);
-    match.dateLabel = localParts.dateLabel;
-    match.timeLabel = localParts.timeLabel;
-  }
-  if (venueName) match.venue = venueName;
-  if (status) match.status = status;
-
-  if (isProviderFinal(status) && homeGoals !== null && awayGoals !== null) {
-    if (!match.resultLocked) {
-      match.homeGoals = homeGoals;
-      match.awayGoals = awayGoals;
-      match.final = true;
-      match.unlocked = true;
-      match.resultLocked = true;
-      match.winner = resolveWinnerFromFixture(match, fixture);
-    }
-  }
-}
-
-function teamsMatch(localTeam, providerTeam) {
-  const localCanonical = canonicalTeam(localTeam);
-  const providerCanonical = canonicalTeam(providerTeam);
-  return localCanonical === providerCanonical;
-}
-
-function canonicalTeam(team) {
-  const normalized = normalizeTeam(team);
-  const found = Object.entries(TEAM_ALIASES).find(([, aliases]) =>
-    aliases.map(normalizeTeam).includes(normalized),
-  );
-  return found ? found[0] : normalized;
-}
-
-function normalizeProviderGoal(goal) {
-  if (goal === null || goal === undefined) return null;
-  const number = Number(goal);
-  return Number.isInteger(number) ? number : null;
-}
-
-function isProviderFinal(status) {
-  return ["FT", "AET", "PEN"].includes(status);
-}
-
-function resolveWinnerFromFixture(match, fixture) {
-  if (match.stage === "GR") return "";
-  const winnerId = fixture.teams?.home?.winner ? "home" : fixture.teams?.away?.winner ? "away" : "";
-  if (winnerId) return winnerId;
-  if (match.homeGoals > match.awayGoals) return "home";
-  if (match.awayGoals > match.homeGoals) return "away";
-  return match.winner || "";
-}
-
-function formatFixtureDate(startsAtUtc) {
-  const date = new Date(startsAtUtc);
-  const dateLabel = new Intl.DateTimeFormat("es-AR", {
-    day: "numeric",
-    month: "short",
-    timeZone: "America/Buenos_Aires",
-  })
-    .format(date)
-    .replace(".", "");
-  const timeLabel = new Intl.DateTimeFormat("es-AR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "America/Buenos_Aires",
-  }).format(date);
-  return { dateLabel, timeLabel };
 }
 
 function calculateLeaderboard() {

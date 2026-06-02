@@ -42,11 +42,7 @@ archivo no se sube a Git.
 
 ```json
 {
-  "ADMIN_CODE": "cambiar-este-codigo",
-  "API_FOOTBALL_KEY": "tu-api-key",
-  "API_FOOTBALL_BASE_URL": "https://v3.football.api-sports.io",
-  "API_FOOTBALL_LEAGUE_ID": "1",
-  "API_FOOTBALL_SEASON": "2026"
+  "ADMIN_CODE": "cambiar-este-codigo"
 }
 ```
 
@@ -54,27 +50,12 @@ Tambien se soporta `.env`:
 
 ```text
 ADMIN_CODE=cambiar-este-codigo
-API_FOOTBALL_KEY=tu-api-key
-API_FOOTBALL_BASE_URL=https://v3.football.api-sports.io
-API_FOOTBALL_LEAGUE_ID=1
-API_FOOTBALL_SEASON=2026
 ```
 
-## Sincronizacion de fixture
+## Fixture y resultados
 
-La pantalla Admin tiene un boton `Sincronizar fixture`. Usa API-Football/API-SPORTS
-cuando estas variables estan configuradas por entorno, `.env` o `config.local.json`:
-
-```powershell
-$env:API_FOOTBALL_KEY="tu-api-key"
-$env:API_FOOTBALL_LEAGUE_ID="1"
-$env:API_FOOTBALL_SEASON="2026"
-node server.js
-```
-
-La sincronizacion actualiza `externalFixtureId`, fecha/hora local de Argentina, sede,
-estado del partido y, cuando el proveedor marca el partido como finalizado, resultado
-oficial. Si un resultado ya estaba bloqueado, no lo modifica.
+El fixture de fase de grupos esta cargado localmente con fecha, hora y sede. Los resultados
+oficiales se cargan manualmente desde Admin y quedan bloqueados al marcar el partido como final.
 
 ## Deploy con Docker
 
@@ -82,7 +63,6 @@ oficial. Si un resultado ya estaba bloqueado, no lo modifica.
 docker build -t prode-mundial-2026 .
 docker run --rm -p 8080:80 `
   -e ADMIN_CODE="cambiar-este-codigo" `
-  -e API_FOOTBALL_KEY="tu-api-key" `
   prode-mundial-2026
 ```
 
