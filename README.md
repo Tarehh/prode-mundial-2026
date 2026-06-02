@@ -24,6 +24,20 @@ node server.js
 
 Luego entrar a `http://localhost:4174`.
 
+Para validar cambios:
+
+```powershell
+npm run check
+```
+
+Si no tenes `npm` en el PATH, tambien sirve correr:
+
+```powershell
+node --check app.js
+node --check server.js
+node --test
+```
+
 Credenciales iniciales:
 
 - Jugador demo: `Demo`
@@ -63,6 +77,7 @@ oficiales se cargan manualmente desde Admin y quedan bloqueados al marcar el par
 docker build -t prode-mundial-2026 .
 docker run --rm -p 8080:80 `
   -e ADMIN_CODE="cambiar-este-codigo" `
+  -v ${PWD}\data:/app/data `
   prode-mundial-2026
 ```
 

@@ -309,7 +309,7 @@ function getSummarySlides() {
     },
     {
       kicker: "Lider actual",
-      value: leader ? `${leader.name} · ${leader.points} pts` : "Sin lider",
+      value: leader ? `${leader.name} - ${leader.points} pts` : "Sin lider",
       meta: leader ? `${leader.hits} aciertos sobre ${leader.played} finalizados.` : "El ranking se activa con resultados.",
     },
   ];
@@ -318,7 +318,7 @@ function getSummarySlides() {
     slides.push({
       kicker: index === 0 ? "Proximo partido" : "Tambien abierto",
       value: `${match.home} vs ${match.away}`,
-      meta: `${matchDateText(match)} · ${stageLabel(match)}${match.group ? ` · Grupo ${match.group}` : ""}`,
+      meta: `${matchDateText(match)} - ${stageLabel(match)}${match.group ? ` - Grupo ${match.group}` : ""}`,
       date: matchDateText(match),
     });
   });
@@ -611,7 +611,7 @@ function stageLabel(match) {
 
 function matchDateText(match) {
   if (!match.dateLabel && !match.timeLabel) return "Fecha a confirmar";
-  return [match.dateLabel, match.timeLabel].filter(Boolean).join(" · ");
+  return [match.dateLabel, match.timeLabel].filter(Boolean).join(" - ");
 }
 
 function escapeHtml(value) {

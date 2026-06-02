@@ -9,6 +9,7 @@ const PORT = Number(process.env.PORT || 4174);
 const ADMIN_CODE = process.env.ADMIN_CODE || "admin2026";
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, "data", "store.json");
 const PUBLIC_DIR = __dirname;
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
 const GROUPS = {
   A: ["Mexico", "Sudafrica", "Corea del Sur", "Chequia"],
@@ -116,9 +117,11 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`Prode Mundial 2026 escuchando en http://127.0.0.1:${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`Prode Mundial 2026 escuchando en http://127.0.0.1:${PORT}`);
+  });
+}
 
 async function handleApi(req, res, url) {
   const body = await readBody(req);
@@ -240,14 +243,14 @@ async function handleApi(req, res, url) {
   throw httpError(404, "Endpoint no encontrado");
 }
 
-function buildClientState(session) {
+function buildClientState(session, database = db) {
   return {
-    players: db.players.map(publicPlayer),
-    matches: db.matches,
+    players: database.players.map(publicPlayer),
+    matches: database.matches,
     predictions:
       session?.role === "player"
         ? Object.fromEntries(
-            db.predictions
+            database.predictions
               .filter((prediction) => prediction.playerId === session.playerId)
               .map((prediction) => [prediction.matchId, publicPrediction(prediction)]),
           )
@@ -256,11 +259,11 @@ function buildClientState(session) {
       ? {
           role: session.role,
           playerId: session.playerId || null,
-          playerName: db.players.find((player) => player.id === session.playerId)?.name || null,
+          playerName: database.players.find((player) => player.id === session.playerId)?.name || null,
         }
       : null,
-    summary: buildSummary(),
-    leaderboard: calculateLeaderboard(),
+    summary: buildSummary(database),
+    leaderboard: calculateLeaderboard(database),
   };
 }
 
@@ -357,16 +360,16 @@ function saveDb() {
   fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
 }
 
-function upsertPrediction(playerId, matchId, body) {
-  const match = db.matches.find((item) => item.id === matchId);
+function upsertPrediction(playerId, matchId, body, database = db) {
+  const match = database.matches.find((item) => item.id === matchId);
   if (!match) throw httpError(404, "Partido no encontrado");
   if (!match.unlocked || match.final) throw httpError(409, "El partido no esta abierto");
 
-  let prediction = db.predictions.find((item) => item.playerId === playerId && item.matchId === matchId);
+  let prediction = database.predictions.find((item) => item.playerId === playerId && item.matchId === matchId);
   if (prediction?.locked) throw httpError(409, "Pronostico confirmado y bloqueado");
   if (!prediction) {
     prediction = { playerId, matchId, homeGoals: null, awayGoals: null, locked: false, createdAt: now() };
-    db.predictions.push(prediction);
+    database.predictions.push(prediction);
   }
 
   prediction.homeGoals = normalizeGoals(body.homeGoals);
@@ -374,51 +377,67 @@ function upsertPrediction(playerId, matchId, body) {
   prediction.updatedAt = now();
 }
 
-function commitPlayerPredictions(playerId, matchIds) {
+function commitPlayerPredictions(playerId, matchIds, database = db) {
   const targetIds = Array.isArray(matchIds)
     ? new Set(matchIds)
-    : new Set(db.matches.filter((match) => match.unlocked && !match.final).map((match) => match.id));
-  db.predictions
+    : new Set(database.matches.filter((match) => match.unlocked && !match.final).map((match) => match.id));
+  let lockedCount = 0;
+  database.predictions
     .filter((prediction) => prediction.playerId === playerId && targetIds.has(prediction.matchId))
     .filter((prediction) => prediction.homeGoals !== null && prediction.awayGoals !== null)
     .forEach((prediction) => {
       prediction.locked = true;
       prediction.lockedAt = now();
+      lockedCount += 1;
     });
-  audit("predictions.commit", { playerId, count: targetIds.size });
+  audit("predictions.commit", { playerId, count: lockedCount }, database);
+  return lockedCount;
 }
 
-function updateMatch(matchId, body) {
-  const match = db.matches.find((item) => item.id === matchId);
+function updateMatch(matchId, body, database = db) {
+  const match = database.matches.find((item) => item.id === matchId);
   if (!match) throw httpError(404, "Partido no encontrado");
   if (match.resultLocked) throw httpError(409, "Resultado final bloqueado");
 
   if ("unlocked" in body) match.unlocked = Boolean(body.unlocked);
   if ("homeGoals" in body) match.homeGoals = normalizeGoals(body.homeGoals);
   if ("awayGoals" in body) match.awayGoals = normalizeGoals(body.awayGoals);
-  if ("winner" in body) match.winner = String(body.winner || "");
+  if ("winner" in body) {
+    const winner = String(body.winner || "");
+    if (winner && !["home", "away"].includes(winner)) throw httpError(400, "Ganador final invalido");
+    match.winner = winner;
+  }
   if ("final" in body) {
     if (body.final) {
       if (match.homeGoals === null || match.awayGoals === null) {
         throw httpError(400, "Carga el resultado antes de finalizar");
       }
+      if (match.stage !== "GR") {
+        const scoreWinner =
+          match.homeGoals > match.awayGoals ? "home" : match.awayGoals > match.homeGoals ? "away" : "";
+        if (!match.winner && scoreWinner) match.winner = scoreWinner;
+        if (!match.winner) throw httpError(400, "Selecciona el ganador final de la eliminatoria");
+        if (scoreWinner && match.winner !== scoreWinner) {
+          throw httpError(400, "El ganador final no coincide con el resultado cargado");
+        }
+      }
       match.final = true;
       match.unlocked = true;
       match.resultLocked = true;
-      audit("match.finalize", { matchId });
+      audit("match.finalize", { matchId }, database);
     } else {
       match.final = false;
     }
   }
 }
 
-function calculateLeaderboard() {
-  return db.players
+function calculateLeaderboard(database = db) {
+  return database.players
     .map((player) => {
-      const scores = db.matches
+      const scores = database.matches
         .filter((match) => match.final)
         .map((match) => {
-          const prediction = db.predictions.find(
+          const prediction = database.predictions.find(
             (item) => item.playerId === player.id && item.matchId === match.id,
           );
           return scorePrediction(prediction, match);
@@ -469,12 +488,12 @@ function scorePrediction(prediction, match) {
   return { points };
 }
 
-function buildSummary() {
-  const leaderboard = calculateLeaderboard();
+function buildSummary(database = db) {
+  const leaderboard = calculateLeaderboard(database);
   return {
-    totalPlayers: db.players.length,
-    openMatches: db.matches.filter((match) => match.unlocked && !match.final).length,
-    finishedMatches: db.matches.filter((match) => match.final).length,
+    totalPlayers: database.players.length,
+    openMatches: database.matches.filter((match) => match.unlocked && !match.final).length,
+    finishedMatches: database.matches.filter((match) => match.final).length,
     leaderPoints: leaderboard[0]?.points || 0,
   };
 }
@@ -502,7 +521,9 @@ function verifyPin(pin, pinHash) {
   const [salt, storedHash] = String(pinHash || "").split(":");
   if (!salt || !storedHash) return false;
   const hash = crypto.pbkdf2Sync(String(pin), salt, 120000, 32, "sha256").toString("hex");
-  return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(storedHash, "hex"));
+  const calculated = Buffer.from(hash, "hex");
+  const stored = Buffer.from(storedHash, "hex");
+  return calculated.length === stored.length && crypto.timingSafeEqual(calculated, stored);
 }
 
 function createSession(payload) {
@@ -513,7 +534,14 @@ function createSession(payload) {
 
 function getSession(req) {
   const token = getBearerToken(req);
-  return token ? sessions.get(token) || null : null;
+  if (!token) return null;
+  const session = sessions.get(token);
+  if (!session) return null;
+  if (Date.now() - session.createdAt > SESSION_TTL_MS) {
+    sessions.delete(token);
+    return null;
+  }
+  return session;
 }
 
 function getBearerToken(req) {
@@ -542,8 +570,8 @@ function generatePin() {
   return String(crypto.randomInt(100000, 1000000));
 }
 
-function audit(action, data) {
-  db.auditLog.push({ action, data, at: now() });
+function audit(action, data, database = db) {
+  database.auditLog.push({ action, data, at: now() });
 }
 
 function now() {
@@ -552,9 +580,20 @@ function now() {
 
 async function readBody(req) {
   if (!["POST", "PATCH", "PUT"].includes(req.method)) return {};
-  let raw = "";
-  for await (const chunk of req) raw += chunk;
-  return raw ? JSON.parse(raw) : {};
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 1024 * 1024) throw httpError(413, "El cuerpo de la solicitud es demasiado grande");
+    chunks.push(chunk);
+  }
+  const raw = Buffer.concat(chunks).toString("utf8").trim();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw httpError(400, "JSON invalido");
+  }
 }
 
 function serveStatic(res, pathname) {
@@ -565,7 +604,8 @@ function serveStatic(res, pathname) {
   const ext = path.extname(filePath);
   const allowedExtensions = new Set([".html", ".css", ".js", ".webmanifest", ".svg"]);
   if (
-    !filePath.startsWith(PUBLIC_DIR) ||
+    relativePath.startsWith("..") ||
+    path.isAbsolute(relativePath) ||
     filePath === __filename ||
     firstSegment.startsWith(".") ||
     firstSegment === "data" ||
@@ -643,7 +683,21 @@ function cleanConfigValue(value) {
     .trim();
 }
 
-function normalizeBaseUrl(value) {
-  if (!value) return "https://v3.football.api-sports.io";
-  return value.startsWith("http://") || value.startsWith("https://") ? value : `https://${value}`;
-}
+module.exports = {
+  buildClientState,
+  buildSummary,
+  calculateLeaderboard,
+  commitPlayerPredictions,
+  createInitialDb,
+  enrichSchedule,
+  hashPin,
+  httpError,
+  normalizeGoals,
+  publicPlayer,
+  publicPrediction,
+  scorePrediction,
+  server,
+  updateMatch,
+  upsertPrediction,
+  verifyPin,
+};
