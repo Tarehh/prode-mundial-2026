@@ -37,11 +37,30 @@ $env:ADMIN_CODE="cambiar-este-codigo"
 node server.js
 ```
 
+## Sincronizacion de fixture
+
+La pantalla Admin tiene un boton `Sincronizar fixture`. Usa API-Football/API-SPORTS
+cuando estas variables estan configuradas:
+
+```powershell
+$env:API_FOOTBALL_KEY="tu-api-key"
+$env:API_FOOTBALL_LEAGUE_ID="1"
+$env:API_FOOTBALL_SEASON="2026"
+node server.js
+```
+
+La sincronizacion actualiza `externalFixtureId`, fecha/hora local de Argentina, sede,
+estado del partido y, cuando el proveedor marca el partido como finalizado, resultado
+oficial. Si un resultado ya estaba bloqueado, no lo modifica.
+
 ## Deploy con Docker
 
 ```powershell
 docker build -t prode-mundial-2026 .
-docker run --rm -p 8080:80 -e ADMIN_CODE="cambiar-este-codigo" prode-mundial-2026
+docker run --rm -p 8080:80 `
+  -e ADMIN_CODE="cambiar-este-codigo" `
+  -e API_FOOTBALL_KEY="tu-api-key" `
+  prode-mundial-2026
 ```
 
 ## Persistencia
