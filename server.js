@@ -831,7 +831,8 @@ function loadLocalConfig() {
   }
 
   if (fs.existsSync(jsonPath)) {
-    const config = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
+    const configText = fs.readFileSync(jsonPath, "utf8").replace(/^\uFEFF/, "").trim();
+    const config = JSON.parse(configText);
     Object.entries(config).forEach(([key, value]) => {
       if (process.env[key] === undefined && value !== undefined && value !== null) {
         process.env[key] = String(value);
