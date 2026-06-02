@@ -9,9 +9,12 @@ const PORT = Number(process.env.PORT || 4174);
 const ADMIN_CODE = process.env.ADMIN_CODE || "admin2026";
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, "data", "store.json");
 const PUBLIC_DIR = __dirname;
-const API_FOOTBALL_KEY = process.env.API_FOOTBALL_KEY || "";
-const API_FOOTBALL_LEAGUE_ID = process.env.API_FOOTBALL_LEAGUE_ID || "1";
-const API_FOOTBALL_SEASON = process.env.API_FOOTBALL_SEASON || "2026";
+const API_FOOTBALL_KEY = cleanConfigValue(process.env.API_FOOTBALL_KEY || "");
+const API_FOOTBALL_LEAGUE_ID = cleanConfigValue(process.env.API_FOOTBALL_LEAGUE_ID || "1");
+const API_FOOTBALL_SEASON = cleanConfigValue(process.env.API_FOOTBALL_SEASON || "2026");
+const API_FOOTBALL_BASE_URL = normalizeBaseUrl(
+  cleanConfigValue(process.env.API_FOOTBALL_BASE_URL || "https://v3.football.api-sports.io"),
+);
 
 const GROUPS = {
   A: ["Mexico", "Sudafrica", "Corea del Sur", "Chequia"],
@@ -478,7 +481,7 @@ async function syncFixturesFromProvider() {
     throw httpError(400, "Configura API_FOOTBALL_KEY para sincronizar fixtures");
   }
 
-  const url = new URL("https://v3.football.api-sports.io/fixtures");
+  const url = new URL("/fixtures", API_FOOTBALL_BASE_URL);
   url.searchParams.set("league", API_FOOTBALL_LEAGUE_ID);
   url.searchParams.set("season", API_FOOTBALL_SEASON);
 
@@ -841,7 +844,7 @@ function loadLocalConfig() {
         const separatorIndex = line.indexOf("=");
         if (separatorIndex === -1) return;
         const key = line.slice(0, separatorIndex).trim();
-        const value = line.slice(separatorIndex + 1).trim().replace(/^["']|["']$/g, "");
+        const value = cleanConfigValue(line.slice(separatorIndex + 1));
         if (key && process.env[key] === undefined) process.env[key] = value;
       });
   }
@@ -851,8 +854,21 @@ function loadLocalConfig() {
     const config = JSON.parse(configText);
     Object.entries(config).forEach(([key, value]) => {
       if (process.env[key] === undefined && value !== undefined && value !== null) {
-        process.env[key] = String(value);
+        process.env[key] = cleanConfigValue(value);
       }
     });
   }
+}
+
+function cleanConfigValue(value) {
+  return String(value)
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .trim();
+}
+
+function normalizeBaseUrl(value) {
+  if (!value) return "https://v3.football.api-sports.io";
+  return value.startsWith("http://") || value.startsWith("https://") ? value : `https://${value}`;
 }

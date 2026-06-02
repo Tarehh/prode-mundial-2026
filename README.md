@@ -44,6 +44,7 @@ archivo no se sube a Git.
 {
   "ADMIN_CODE": "cambiar-este-codigo",
   "API_FOOTBALL_KEY": "tu-api-key",
+  "API_FOOTBALL_BASE_URL": "https://v3.football.api-sports.io",
   "API_FOOTBALL_LEAGUE_ID": "1",
   "API_FOOTBALL_SEASON": "2026"
 }
@@ -54,6 +55,7 @@ Tambien se soporta `.env`:
 ```text
 ADMIN_CODE=cambiar-este-codigo
 API_FOOTBALL_KEY=tu-api-key
+API_FOOTBALL_BASE_URL=https://v3.football.api-sports.io
 API_FOOTBALL_LEAGUE_ID=1
 API_FOOTBALL_SEASON=2026
 ```
