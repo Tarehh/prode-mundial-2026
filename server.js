@@ -487,9 +487,15 @@ async function syncFixturesFromProvider() {
       "x-apisports-key": API_FOOTBALL_KEY,
     },
   });
-  if (!response.ok) throw httpError(502, `API-Football respondio ${response.status}`);
+  const payload = await response.json().catch(() => ({}));
+  const providerError = formatProviderError(payload);
+  if (!response.ok || providerError) {
+    throw httpError(
+      response.status === 403 || providerError ? 403 : 502,
+      providerError || `API-Football respondio ${response.status}`,
+    );
+  }
 
-  const payload = await response.json();
   const fixtures = Array.isArray(payload.response) ? payload.response : [];
   let updated = 0;
   let finalized = 0;
@@ -523,6 +529,16 @@ async function syncFixturesFromProvider() {
     totalFromProvider: fixtures.length,
     syncedAt: now(),
   };
+}
+
+function formatProviderError(payload) {
+  if (!payload?.errors) return "";
+  if (typeof payload.errors === "string") return payload.errors;
+  if (Array.isArray(payload.errors)) return payload.errors.join(". ");
+  const messages = Object.entries(payload.errors)
+    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(", ") : value}`)
+    .filter(Boolean);
+  return messages.join(". ");
 }
 
 function findMatchForFixture(fixture) {
