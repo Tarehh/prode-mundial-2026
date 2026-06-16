@@ -1,0 +1,160 @@
+<section class="panel" id="adminPanel">
+  <div class="toolbar">
+    <div>
+      <h2>Administracion del prode</h2>
+      <p>Desbloquea fechas, carga resultados y suma partidos de eliminacion.</p>
+    </div>
+    <div class="admin-actions">
+      <button class="button" id="unlockNextButton" type="button">Abrir proxima tanda</button>
+      <button class="button secondary" id="exportAdminButton" type="button">Exportar JSON</button>
+    </div>
+  </div>
+
+  <form class="admin-form" id="knockoutForm">
+    <h3>Agregar partido de eliminacion</h3>
+    <div class="form-grid">
+      <label>
+        Equipo A
+        <input id="knockoutHome" required placeholder="Argentina" />
+      </label>
+      <label>
+        Equipo B
+        <input id="knockoutAway" required placeholder="Brasil" />
+      </label>
+      <label>
+        Ronda
+        <select id="knockoutRound">
+          <option value="R32">16avos</option>
+          <option value="R16">Octavos</option>
+          <option value="QF">Cuartos</option>
+          <option value="SF">Semifinal</option>
+          <option value="F">Final</option>
+        </select>
+      </label>
+      <button class="button" type="submit">Agregar</button>
+    </div>
+  </form>
+
+  <div class="admin-list" id="adminMatchList"></div>
+
+  <!-- TABLA DE USUARIOS -->
+  <div class="admin-section">
+    <h3>Gestión de Usuarios</h3>
+    <div class="table-responsive">
+      <table class="admin-table" id="usuariosTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>PIN</th>
+            <th>Es Admin</th>
+            <th>Creado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="usuariosTableBody">
+          <tr><td colspan="7" class="text-center">Cargando usuarios...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TABLA DE PARTIDOS -->
+  <div class="admin-section">
+    <h3>Gestión de Partidos</h3>
+    <div class="table-responsive">
+      <table class="admin-table" id="partidosTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Equipo Local</th>
+            <th>Equipo Visitante</th>
+            <th>Fecha</th>
+            <th>Goles Local</th>
+            <th>Goles Visitante</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="partidosTableBody">
+          <tr><td colspan="8" class="text-center">Cargando partidos...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MODAL PARA EDITAR USUARIO -->
+  <div class="modal" id="editUserModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Actualizar Usuario</h3>
+        <button class="modal-close" type="button" data-close-modal="editUserModal">&times;</button>
+      </div>
+      <form id="editUserForm" class="admin-form">
+        <input type="hidden" id="editUserId" />
+        <div class="form-grid">
+          <label>
+            Nombre
+            <input id="editUserName" required />
+          </label>
+          <label>
+            Email
+            <input id="editUserEmail" type="email" required />
+          </label>
+          <label>
+            PIN
+            <input id="editUserPin" inputmode="numeric" />
+          </label>
+          <label>
+            <input id="editUserAdmin" type="checkbox" />
+            Es Administrador
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="button" type="submit">Guardar cambios</button>
+          <button class="button secondary" type="button" data-close-modal="editUserModal">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL PARA EDITAR PARTIDO -->
+  <div class="modal" id="editPartidoModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Actualizar Partido</h3>
+        <button class="modal-close" type="button" data-close-modal="editPartidoModal">&times;</button>
+      </div>
+      <form id="editPartidoForm" class="admin-form">
+        <input type="hidden" id="editPartidoId" />
+        <div class="form-grid">
+          <label>
+            Equipo Local
+            <input id="editPartidoLocal" required />
+          </label>
+          <label>
+            Equipo Visitante
+            <input id="editPartidoVisitante" required />
+          </label>
+          <label>
+            Fecha
+            <input id="editPartidoFecha" type="datetime-local" required />
+          </label>
+          <label>
+            Goles Local
+            <input id="editPartidoGolesLocal" type="number" min="0" />
+          </label>
+          <label>
+            Goles Visitante
+            <input id="editPartidoGolesVisitante" type="number" min="0" />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="button" type="submit">Guardar cambios</button>
+          <button class="button secondary" type="button" data-close-modal="editPartidoModal">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
